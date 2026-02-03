@@ -27,3 +27,5 @@ CREATE CONSTRAINT FOR (p:Product) REQUIRE p.id IS UNIQUE;
 // (:Component)-[:PART_OF]->(:Product)
 // (:RiskEvent)-[:AFFECTS]->(:Location)
 // (:Company)-[:LOCATED_IN]->(:Location)
+
+
