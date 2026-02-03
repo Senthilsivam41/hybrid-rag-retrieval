@@ -1,6 +1,4 @@
-Here is the comprehensive guide on **Semantic RAG (GraphRAG)** based on our discussion. You can copy the content below and save it as a `.md` file.
 
----
 
 # Article: Mastering Semantic RAG with Hybrid Knowledge Graphs
 
