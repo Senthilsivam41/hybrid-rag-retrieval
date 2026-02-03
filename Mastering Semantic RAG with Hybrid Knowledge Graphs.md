@@ -97,4 +97,3 @@ Semantic RAG turns a "black box" vector search into a transparent, navigable map
 
 ---
 
-**Would you like me to generate a specific Cypher schema template for a particular use case, such as Legal Research or Medical Diagnosis?**
