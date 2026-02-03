@@ -1,52 +1,75 @@
-A perfect use case for Semantic RAG is Supply Chain Risk Management. In this scenario, a pure vector search might find a news article about a "factory fire in Taiwan," but it won't know that the factory belongs to a supplier that provides the only semiconductor chip used in your "Flagship Laptop."
+Use Case: Supply Chain Risk Resilience via Semantic RAG
+1. Overview
+In global logistics, a "local" event (like a factory fire or earthquake) creates a "global" impact. Standard Vector RAG can find news about the event, but it cannot navigate the complex web of dependencies required to tell you which of your products will be delayed. This Semantic RAG approach bridges that gap.
 
-The Graph DB maps the structural dependencies, while the Vector DB handles the unstructured news feeds and incident reports.
+2. The Knowledge Schema (Cypher)
+To ensure the LLM extracts data consistently, we define a strict schema. This acts as a "map" for the Graph Database.
 
-Use Case: Supply Chain Resilience
-1. The Cypher Schema Template
-To implement this, you first define a strict schema to prevent "graph explosion." This ensures the LLM only extracts relationships that matter to your business logic.
+Nodes and Relationships
+Company: Manufacturers and suppliers.
 
+Product: Your end-user offerings.
+
+Component: The parts required to build products.
+
+Location: Geographic regions (Cities/Countries).
+
+RiskEvent: Disruptions (Natural disasters, strikes, etc.).
+
+Schema Template
 Cypher
-// 1. Define Constraints
+// 1. Constraints for Data Integrity
 CREATE CONSTRAINT FOR (c:Company) REQUIRE c.id IS UNIQUE;
 CREATE CONSTRAINT FOR (p:Product) REQUIRE p.id IS UNIQUE;
 
-// 2. The Extraction Schema (Template for LLM)
-// Nodes: Company, Product, Location, Component, RiskEvent
-// Relationships: 
+// 2. The Graph Architecture
 // (:Company)-[:MANUFACTURES]->(:Product)
 // (:Company)-[:SUPPLIES]->(:Component)
 // (:Component)-[:PART_OF]->(:Product)
 // (:RiskEvent)-[:AFFECTS]->(:Location)
 // (:Company)-[:LOCATED_IN]->(:Location)
-2. High-Value Multi-Hop Query
-Imagine a user asks: "What is our exposure to the recent earthquake in the Hsinchu region?"
+3. The Hybrid Retrieval Logic
+Step A: Vector Search (The "What")
+The user asks: "How will the earthquake in Hsinchu affect our Q4 laptop production?" The Vector DB retrieves recent incident reports and news snippets containing:
 
-Vector DB Search: Finds unstructured reports/news mentions of "Earthquake" and "Hsinchu."
+“Magnitude 6.1 earthquake strikes Hsinchu Industrial Park...”
 
-Graph Traversal: 1. Identifies Location {name: "Hsinchu"}. 2. Finds all Company nodes LOCATED_IN Hsinchu. 3. Traverses to Components those companies supply. 4. Links those Components to your internal Products.
+“Power outages reported at major semiconductor facilities...”
 
-3. Implementation: Text-to-Cypher Prompt
-To make the retriever dynamic, you can use a prompt that tells the LLM how to query the graph based on the user's intent.
+Step B: Graph Traversal (The "Who" and "Where")
+Using the entities found (Hsinchu, Earthquake), the system executes a multi-hop traversal:
 
-Python
-CYPHER_GENERATION_PROMPT = """
-Task: Convert the user's natural language question into a Cypher query based on the following schema:
-(Company)-[:SUPPLIES]->(Component)-[:PART_OF]->(Product)
-(Company)-[:LOCATED_IN]->(Location)
-(RiskEvent)-[:AFFECTS]->(Location)
+Cypher
+MATCH (re:RiskEvent {type: "Earthquake"})-[:AFFECTS]->(l:Location {name: "Hsinchu"})
+MATCH (c:Company)-[:LOCATED_IN]->(l)
+MATCH (c)-[:SUPPLIES]->(comp:Component)-[:PART_OF]->(p:Product {category: "Laptop"})
+RETURN p.name AS ImpactedProduct, c.name AS Supplier, comp.name AS CriticalPart
+4. Sample "Golden Dataset"
+Copy and paste this into a Neo4j sandbox to visualize the connections:
 
-Question: {query_str}
+Cypher
+// Create Locations
+CREATE (l1:Location {name: "Hsinchu", region: "Taiwan"})
 
-Cypher Query:
-"""
+// Create Companies
+CREATE (c1:Company {name: "TSMC", id: "CO_001"})
+CREATE (c2:Company {name: "GlobalFoundries", id: "CO_002"})
 
-# Example result for the Earthquake query:
-# MATCH (re:RiskEvent {type: "Earthquake"})-[:AFFECTS]->(l:Location)
-# MATCH (c:Company)-[:LOCATED_IN]->(l)
-# MATCH (c)-[:SUPPLIES]->(comp:Component)-[:PART_OF]->(p:Product)
-# RETURN p.name, c.name, re.severity
-Why this solves the "Missing Link"
-If you only used Vector RAG, the model might tell you about the earthquake but fail to realize that your laptop production is at risk because it doesn't "know" the supplier-product relationship—that data is often buried in separate procurement spreadsheets, not the news article.
+// Create Products & Components
+CREATE (p1:Product {name: "Zenith Laptop", id: "PROD_99"})
+CREATE (comp1:Component {name: "M3 Processor", id: "COMP_10"})
 
-By using the Cypher Schema Template, you force the RAG system to check these specific paths every time a "RiskEvent" is mentioned.
+// Establish Relationships
+CREATE (c1)-[:LOCATED_IN]->(l1)
+CREATE (c1)-[:SUPPLIES]->(comp1)
+CREATE (comp1)-[:PART_OF]->(p1)
+
+// Add a Risk Event
+CREATE (re:RiskEvent {type: "Earthquake", severity: "High"})
+CREATE (re)-[:AFFECTS]->(l1)
+5. Summary of Benefits
+Logical Inference: The system "knows" that even if your laptop isn't mentioned in the news, it is impacted because it uses a component made in the affected region.
+
+Precision: Eliminates hallucinations where the LLM might guess which companies are in Hsinchu.
+
+Speed: By targeting specific locations in the graph, we avoid scanning millions of unrelated document vectors.
